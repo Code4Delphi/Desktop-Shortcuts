@@ -56,6 +56,11 @@
     <DCCReference Include="rtl.dcp" />
     <DCCReference Include="vcl.dcp" />
     <DCCReference Include="designide.dcp" />
+    <DCCReference Include="DesktopShortcuts.Settings.pas" />
+    <DCCReference Include="DesktopShortcuts.Form.pas">
+      <Form>DesktopShortcutsForm</Form>
+      <FormType>dfm</FormType>
+    </DCCReference>
     <DCCReference Include="DesktopShortcuts.Wizard.pas" />
     <BuildConfiguration Include="Debug">
       <Key>Cfg_1</Key>

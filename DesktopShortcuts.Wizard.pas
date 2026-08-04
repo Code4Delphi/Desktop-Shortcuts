@@ -5,32 +5,30 @@ interface
 uses
   System.Classes,
   System.SysUtils,
-  Winapi.Windows,
   Vcl.ActnList,
   Vcl.Menus,
-  ToolsAPI;
+  ToolsAPI,
+  DesktopShortcuts.Form,
+  DesktopShortcuts.Settings;
 
 type
   TDesktopShortcutsWizard = class(TNotifierObject, IOTAWizard)
-  private const
-    CCodeOnlyDesktop = 'Code only Layout';
-    CCodeOnlyDesktopAlias = 'Code Only';
-    CDefaultLayoutDesktop = 'Default Layout';
-    CShortsDesktop = 'SHORTS';
   private
-    FCodeOnlyAction: TAction;
-    FDefaultLayoutAction: TAction;
-    FShortsAction: TAction;
-    procedure CodeOnlyActionExecute(ASender: TObject);
-    procedure DefaultLayoutActionExecute(ASender: TObject);
+    FConfigureMenuItem: TMenuItem;
+    FDesktopActions: array[0..2] of TAction;
+    FItems: TDesktopShortcutItems;
+    procedure ApplySettings;
+    procedure ConfigureMenuClick(ASender: TObject);
+    procedure DesktopActionExecute(ASender: TObject);
     function FindDesktopItem(AParent: TMenuItem; const ADesktopName: string): TMenuItem;
     function FindMenuItemByName(AParent: TMenuItem; const AName: string): TMenuItem;
     function GetIDString: string;
     function GetName: string;
     function GetState: TWizardState;
+    procedure GetDesktopNames(AItems: TStrings);
     procedure RegisterActions;
-    procedure ShortsActionExecute(ASender: TObject);
-    procedure SwitchDesktop(const ADesktopName: string; const ADesktopAlias: string = '');
+    procedure RegisterConfigureMenu;
+    procedure SwitchDesktop(const ADesktopName: string);
   public
     constructor Create;
     destructor Destroy; override;
@@ -45,29 +43,56 @@ constructor TDesktopShortcutsWizard.Create;
 begin
   inherited Create;
   Self.RegisterActions;
+  Self.RegisterConfigureMenu;
 end;
 
 destructor TDesktopShortcutsWizard.Destroy;
 begin
-  FCodeOnlyAction.Free;
-  FShortsAction.Free;
-  FDefaultLayoutAction.Free;
+  FConfigureMenuItem.Free;
+  for var i := 0 to Pred(CDesktopShortcutCount) do
+    FDesktopActions[i].Free;
   inherited Destroy;
 end;
 
-procedure TDesktopShortcutsWizard.CodeOnlyActionExecute(ASender: TObject);
+procedure TDesktopShortcutsWizard.ApplySettings;
 begin
-  Self.SwitchDesktop(CCodeOnlyDesktop, CCodeOnlyDesktopAlias);
+  TDesktopShortcutSettings.Load(FItems);
+
+  for var i := 0 to Pred(CDesktopShortcutCount) do
+  begin
+    FDesktopActions[i].Caption := 'Desktop: ' + FItems[i].DesktopName;
+    FDesktopActions[i].Hint := 'Ativar o Desktop ' + FItems[i].DesktopName;
+    FDesktopActions[i].ShortCut := FItems[i].Shortcut;
+  end;
 end;
 
-procedure TDesktopShortcutsWizard.DefaultLayoutActionExecute(ASender: TObject);
+procedure TDesktopShortcutsWizard.ConfigureMenuClick(ASender: TObject);
 begin
-  Self.SwitchDesktop(CDefaultLayoutDesktop);
+  var LDesktopNames := TStringList.Create;
+  try
+    Self.GetDesktopNames(LDesktopNames);
+    if TDesktopShortcutsForm.Execute(LDesktopNames) then
+      Self.ApplySettings;
+  finally
+    LDesktopNames.Free;
+  end;
+end;
+
+procedure TDesktopShortcutsWizard.DesktopActionExecute(ASender: TObject);
+begin
+  if not (ASender is TAction) then
+    Exit;
+
+  var LIndex := TAction(ASender).Tag;
+  if (LIndex < 0) or (LIndex >= CDesktopShortcutCount) then
+    Exit;
+
+  Self.SwitchDesktop(FItems[LIndex].DesktopName);
 end;
 
 procedure TDesktopShortcutsWizard.Execute;
 begin
-  Self.SwitchDesktop(CShortsDesktop);
+  Self.ConfigureMenuClick(nil);
 end;
 
 function TDesktopShortcutsWizard.FindDesktopItem(AParent: TMenuItem;
@@ -114,6 +139,32 @@ begin
   Result := [wsEnabled];
 end;
 
+procedure TDesktopShortcutsWizard.GetDesktopNames(AItems: TStrings);
+var
+  LNTAServices: INTAServices;
+begin
+  AItems.Clear;
+
+  if not Supports(BorlandIDEServices, INTAServices, LNTAServices) then
+    raise Exception.Create('Nao foi possivel acessar os servicos de menu do RAD Studio.');
+
+  var LDesktopMenu := Self.FindMenuItemByName(LNTAServices.MainMenu.Items, 'ViewDesktopsMenu');
+  if not Assigned(LDesktopMenu) then
+    raise Exception.Create('O menu View > Desktops nao foi localizado.');
+
+  LDesktopMenu.Click;
+  for var i := 0 to Pred(LDesktopMenu.Count) do
+  begin
+    var LMenuItem := LDesktopMenu.Items[i];
+    if LMenuItem.Name = 'SaveDesktop1' then
+      Break;
+
+    var LCaption := StringReplace(LMenuItem.Caption, '&', '', [rfReplaceAll]).Trim;
+    if not LCaption.IsEmpty and (LCaption <> '-') and (LCaption.ToUpper <> '<NONE>') then
+      AItems.Add(LCaption);
+  end;
+end;
+
 procedure TDesktopShortcutsWizard.RegisterActions;
 var
   LNTAServices: INTAServices;
@@ -121,41 +172,41 @@ begin
   if not Supports(BorlandIDEServices, INTAServices, LNTAServices) then
     raise Exception.Create('Nao foi possivel acessar os servicos de menu do RAD Studio.');
 
-  FDefaultLayoutAction := TAction.Create(nil);
-  FDefaultLayoutAction.Name := 'DesktopShortcutsDefaultLayoutAction';
-  FDefaultLayoutAction.Caption := 'Desktop: Default Layout';
-  FDefaultLayoutAction.Category := 'Desktop Shortcuts';
-  FDefaultLayoutAction.Hint := 'Ativar o Desktop Default Layout';
-  FDefaultLayoutAction.ShortCut := Vcl.Menus.ShortCut(VK_F10, [ssCtrl, ssShift, ssAlt]);
-  FDefaultLayoutAction.OnExecute := Self.DefaultLayoutActionExecute;
-  FDefaultLayoutAction.ActionList := LNTAServices.ActionList;
-
-  FShortsAction := TAction.Create(nil);
-  FShortsAction.Name := 'DesktopShortcutsShortsAction';
-  FShortsAction.Caption := 'Desktop: SHORTS';
-  FShortsAction.Category := 'Desktop Shortcuts';
-  FShortsAction.Hint := 'Ativar o Desktop SHORTS';
-  FShortsAction.ShortCut := Vcl.Menus.ShortCut(VK_F11, [ssCtrl, ssShift, ssAlt]);
-  FShortsAction.OnExecute := Self.ShortsActionExecute;
-  FShortsAction.ActionList := LNTAServices.ActionList;
-
-  FCodeOnlyAction := TAction.Create(nil);
-  FCodeOnlyAction.Name := 'DesktopShortcutsCodeOnlyAction';
-  FCodeOnlyAction.Caption := 'Desktop: Code Only';
-  FCodeOnlyAction.Category := 'Desktop Shortcuts';
-  FCodeOnlyAction.Hint := 'Ativar o Desktop Code Only';
-  FCodeOnlyAction.ShortCut := Vcl.Menus.ShortCut(VK_F12, [ssCtrl, ssShift, ssAlt]);
-  FCodeOnlyAction.OnExecute := Self.CodeOnlyActionExecute;
-  FCodeOnlyAction.ActionList := LNTAServices.ActionList;
+  TDesktopShortcutSettings.Load(FItems);
+  for var i := 0 to Pred(CDesktopShortcutCount) do
+  begin
+    FDesktopActions[i] := TAction.Create(nil);
+    FDesktopActions[i].Name := 'DesktopShortcutsAction' + (i + 1).ToString;
+    FDesktopActions[i].Caption := 'Desktop: ' + FItems[i].DesktopName;
+    FDesktopActions[i].Category := 'Desktop Shortcuts';
+    FDesktopActions[i].Hint := 'Ativar o Desktop ' + FItems[i].DesktopName;
+    FDesktopActions[i].ShortCut := FItems[i].Shortcut;
+    FDesktopActions[i].Tag := i;
+    FDesktopActions[i].OnExecute := Self.DesktopActionExecute;
+    FDesktopActions[i].ActionList := LNTAServices.ActionList;
+  end;
 end;
 
-procedure TDesktopShortcutsWizard.ShortsActionExecute(ASender: TObject);
+procedure TDesktopShortcutsWizard.RegisterConfigureMenu;
+var
+  LNTAServices: INTAServices;
 begin
-  Self.SwitchDesktop(CShortsDesktop);
+  if not Supports(BorlandIDEServices, INTAServices, LNTAServices) then
+    raise Exception.Create('Nao foi possivel acessar os servicos de menu do RAD Studio.');
+
+  var LHelpMenu := Self.FindMenuItemByName(LNTAServices.MainMenu.Items, 'HelpMenu');
+  if not Assigned(LHelpMenu) then
+    raise Exception.Create('O menu Help nao foi localizado.');
+
+  FConfigureMenuItem := TMenuItem.Create(LNTAServices.MainMenu);
+  FConfigureMenuItem.Name := 'DesktopShortcutsConfigureMenuItem';
+  FConfigureMenuItem.Caption := '&Desktop Shortcuts...';
+  FConfigureMenuItem.Hint := 'Configurar atalhos dos Desktops';
+  FConfigureMenuItem.OnClick := Self.ConfigureMenuClick;
+  LHelpMenu.Add(FConfigureMenuItem);
 end;
 
-procedure TDesktopShortcutsWizard.SwitchDesktop(const ADesktopName: string;
-  const ADesktopAlias: string);
+procedure TDesktopShortcutsWizard.SwitchDesktop(const ADesktopName: string);
 var
   LNTAServices: INTAServices;
 begin
@@ -169,8 +220,11 @@ begin
   LDesktopMenu.Click;
 
   var LDesktopItem := Self.FindDesktopItem(LDesktopMenu, ADesktopName);
-  if not Assigned(LDesktopItem) and not ADesktopAlias.IsEmpty then
-    LDesktopItem := Self.FindDesktopItem(LDesktopMenu, ADesktopAlias);
+  if not Assigned(LDesktopItem) and (ADesktopName.ToUpper = 'CODE ONLY') then
+    LDesktopItem := Self.FindDesktopItem(LDesktopMenu, 'Code only Layout');
+
+  if not Assigned(LDesktopItem) and (ADesktopName.ToUpper = 'CODE ONLY LAYOUT') then
+    LDesktopItem := Self.FindDesktopItem(LDesktopMenu, 'Code Only');
 
   if not Assigned(LDesktopItem) then
     raise Exception.CreateFmt('O Desktop "%s" nao foi localizado.', [ADesktopName]);

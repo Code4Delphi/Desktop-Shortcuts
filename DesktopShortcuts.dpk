@@ -11,6 +11,8 @@ requires
   designide;
 
 contains
+  DesktopShortcuts.Settings in 'DesktopShortcuts.Settings.pas',
+  DesktopShortcuts.Form in 'DesktopShortcuts.Form.pas' {DesktopShortcutsForm},
   DesktopShortcuts.Wizard in 'DesktopShortcuts.Wizard.pas';
 
 end.
