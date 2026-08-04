@@ -1,4 +1,4 @@
-# Desktop Shortcuts
+# Desktop Shortcuts - Plugin Delphi
 
 Plugin para alternar entre os Desktops da IDE do Delphi por meio de atalhos globais.
 
