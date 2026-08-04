@@ -1,2 +1,2 @@
-# Desktop-Shortcuts
-Atalhos para alternar entre Desktops da IDE do Delphi
+# Desktop Shortcuts
+Plugin para atalhos para alternar entre Desktops da IDE do Delphi
