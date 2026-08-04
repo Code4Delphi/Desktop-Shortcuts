@@ -15,11 +15,14 @@ type
   private const
     CCodeOnlyDesktop = 'Code only Layout';
     CCodeOnlyDesktopAlias = 'Code Only';
+    CDefaultLayoutDesktop = 'Default Layout';
     CShortsDesktop = 'SHORTS';
   private
     FCodeOnlyAction: TAction;
+    FDefaultLayoutAction: TAction;
     FShortsAction: TAction;
     procedure CodeOnlyActionExecute(ASender: TObject);
+    procedure DefaultLayoutActionExecute(ASender: TObject);
     function FindDesktopItem(AParent: TMenuItem; const ADesktopName: string): TMenuItem;
     function FindMenuItemByName(AParent: TMenuItem; const AName: string): TMenuItem;
     function GetIDString: string;
@@ -48,12 +51,18 @@ destructor TDesktopShortcutsWizard.Destroy;
 begin
   FCodeOnlyAction.Free;
   FShortsAction.Free;
+  FDefaultLayoutAction.Free;
   inherited Destroy;
 end;
 
 procedure TDesktopShortcutsWizard.CodeOnlyActionExecute(ASender: TObject);
 begin
   Self.SwitchDesktop(CCodeOnlyDesktop, CCodeOnlyDesktopAlias);
+end;
+
+procedure TDesktopShortcutsWizard.DefaultLayoutActionExecute(ASender: TObject);
+begin
+  Self.SwitchDesktop(CDefaultLayoutDesktop);
 end;
 
 procedure TDesktopShortcutsWizard.Execute;
@@ -111,6 +120,15 @@ var
 begin
   if not Supports(BorlandIDEServices, INTAServices, LNTAServices) then
     raise Exception.Create('Nao foi possivel acessar os servicos de menu do RAD Studio.');
+
+  FDefaultLayoutAction := TAction.Create(nil);
+  FDefaultLayoutAction.Name := 'DesktopShortcutsDefaultLayoutAction';
+  FDefaultLayoutAction.Caption := 'Desktop: Default Layout';
+  FDefaultLayoutAction.Category := 'Desktop Shortcuts';
+  FDefaultLayoutAction.Hint := 'Ativar o Desktop Default Layout';
+  FDefaultLayoutAction.ShortCut := Vcl.Menus.ShortCut(VK_F10, [ssCtrl, ssShift, ssAlt]);
+  FDefaultLayoutAction.OnExecute := Self.DefaultLayoutActionExecute;
+  FDefaultLayoutAction.ActionList := LNTAServices.ActionList;
 
   FShortsAction := TAction.Create(nil);
   FShortsAction.Name := 'DesktopShortcutsShortsAction';

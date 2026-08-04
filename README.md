@@ -1,8 +1,9 @@
 # Desktop Shortcuts
 Plugin para atalhos para alternar entre Desktops da IDE do Delphi
 
-Package de design-time para o Delphi 12 que ativa dois Desktops salvos por meio de atalhos globais:
+Package de design-time para o Delphi 12 que ativa três Desktops salvos por meio de atalhos globais:
 
+- `Ctrl+Shift+Alt+F10`: ativa `Default Layout`.
 - `Ctrl+Shift+Alt+F11`: ativa `SHORTS`.
 - `Ctrl+Shift+Alt+F12`: ativa `Code only Layout` ou `Code Only`.
 
