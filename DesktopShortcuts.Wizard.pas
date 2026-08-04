@@ -232,12 +232,6 @@ begin
   LDesktopMenu.Click;
 
   var LDesktopItem := Self.FindDesktopItem(LDesktopMenu, ADesktopName);
-  if not Assigned(LDesktopItem) and (ADesktopName.ToUpper = 'CODE ONLY') then
-    LDesktopItem := Self.FindDesktopItem(LDesktopMenu, 'Code only Layout');
-
-  if not Assigned(LDesktopItem) and (ADesktopName.ToUpper = 'CODE ONLY LAYOUT') then
-    LDesktopItem := Self.FindDesktopItem(LDesktopMenu, 'Code Only');
-
   if not Assigned(LDesktopItem) then
     raise Exception.CreateFmt('O Desktop "%s" nao foi localizado.', [ADesktopName]);
 

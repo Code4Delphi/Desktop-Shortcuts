@@ -4,13 +4,7 @@ Plugin para alternar entre os Desktops da IDE do Delphi por meio de atalhos glob
 
 O package de design-time para o Delphi 12 identifica automaticamente todos os Desktops exibidos em **View > Desktops** e cria uma acao de atalho para cada um deles.
 
-Estas sao as configuracoes iniciais, quando os respectivos Desktops existem:
-
-- `Ctrl+Shift+Alt+F10`: ativa `Default Layout`.
-- `Ctrl+Shift+Alt+F11`: ativa `SHORTS`.
-- `Ctrl+Shift+Alt+F12`: ativa `Code only Layout` ou `Code Only`.
-
-Os demais Desktops aparecem inicialmente sem atalho.
+Todos os Desktops aparecem inicialmente sem atalho. As configuracoes sao definidas pelo usuario.
 
 ## Compilacao e instalacao
 

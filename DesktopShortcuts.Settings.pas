@@ -7,7 +7,6 @@ uses
   System.IniFiles,
   System.IOUtils,
   System.SysUtils,
-  Winapi.Windows,
   Vcl.Menus;
 
 type
@@ -26,7 +25,6 @@ type
     class function SameDesktopName(const AFirstName: string;
       const ASecondName: string): Boolean; static;
   public
-    class procedure Defaults(out AItems: TDesktopShortcutItems); static;
     class function FileName: string; static;
     class procedure Load(out AItems: TDesktopShortcutItems); static;
     class procedure Save(const AItems: TDesktopShortcutItems); static;
@@ -35,17 +33,6 @@ type
   end;
 
 implementation
-
-class procedure TDesktopShortcutSettings.Defaults(out AItems: TDesktopShortcutItems);
-begin
-  SetLength(AItems, 3);
-  AItems[0].DesktopName := 'Default Layout';
-  AItems[0].Shortcut := Vcl.Menus.ShortCut(VK_F10, [ssCtrl, ssShift, ssAlt]);
-  AItems[1].DesktopName := 'SHORTS';
-  AItems[1].Shortcut := Vcl.Menus.ShortCut(VK_F11, [ssCtrl, ssShift, ssAlt]);
-  AItems[2].DesktopName := 'Code only Layout';
-  AItems[2].Shortcut := Vcl.Menus.ShortCut(VK_F12, [ssCtrl, ssShift, ssAlt]);
-end;
 
 class function TDesktopShortcutSettings.FileName: string;
 begin
@@ -58,14 +45,14 @@ end;
 
 class procedure TDesktopShortcutSettings.Load(out AItems: TDesktopShortcutItems);
 begin
-  TDesktopShortcutSettings.Defaults(AItems);
+  SetLength(AItems, 0);
 
   if not FileExists(TDesktopShortcutSettings.FileName) then
     Exit;
 
   var LIniFile := TIniFile.Create(TDesktopShortcutSettings.FileName);
   try
-    var LCount := LIniFile.ReadInteger(CSection, 'Count', Length(AItems));
+    var LCount := LIniFile.ReadInteger(CSection, 'Count', 0);
     if LCount < 0 then
       LCount := 0;
     SetLength(AItems, LCount);
@@ -86,15 +73,7 @@ end;
 class function TDesktopShortcutSettings.SameDesktopName(const AFirstName: string;
   const ASecondName: string): Boolean;
 begin
-  var LFirstName := AFirstName.ToUpper;
-  var LSecondName := ASecondName.ToUpper;
-  Result := LFirstName = LSecondName;
-
-  if Result then
-    Exit;
-
-  Result := ((LFirstName = 'CODE ONLY') and (LSecondName = 'CODE ONLY LAYOUT')) or
-    ((LFirstName = 'CODE ONLY LAYOUT') and (LSecondName = 'CODE ONLY'));
+  Result := AFirstName.ToUpper = ASecondName.ToUpper;
 end;
 
 class procedure TDesktopShortcutSettings.Save(const AItems: TDesktopShortcutItems);
@@ -128,33 +107,18 @@ begin
   for var i := 0 to High(AItems) do
     LSavedItems[i] := AItems[i];
 
-  var LDefaultItems: TDesktopShortcutItems;
-  TDesktopShortcutSettings.Defaults(LDefaultItems);
   SetLength(AItems, ADesktopNames.Count);
 
   for var i := 0 to Pred(ADesktopNames.Count) do
   begin
     AItems[i].DesktopName := ADesktopNames[i];
     AItems[i].Shortcut := 0;
-    var LSavedItemFound := False;
 
     for var j := 0 to High(LSavedItems) do
       if TDesktopShortcutSettings.SameDesktopName(ADesktopNames[i],
         LSavedItems[j].DesktopName) then
       begin
         AItems[i].Shortcut := LSavedItems[j].Shortcut;
-        LSavedItemFound := True;
-        Break;
-      end;
-
-    if LSavedItemFound then
-      Continue;
-
-    for var j := 0 to High(LDefaultItems) do
-      if TDesktopShortcutSettings.SameDesktopName(ADesktopNames[i],
-        LDefaultItems[j].DesktopName) then
-      begin
-        AItems[i].Shortcut := LDefaultItems[j].Shortcut;
         Break;
       end;
   end;
