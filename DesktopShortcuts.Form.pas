@@ -5,33 +5,32 @@ interface
 uses
   System.Classes,
   System.SysUtils,
-  Vcl.ComCtrls,
+  Winapi.Messages,
+  Winapi.Windows,
   Vcl.Controls,
   Vcl.Dialogs,
-  Vcl.Forms,
-  Vcl.StdCtrls,
   Vcl.ExtCtrls,
+  Vcl.Forms,
+  Vcl.Grids,
+  Vcl.Menus,
+  Vcl.StdCtrls,
   DesktopShortcuts.Settings;
 
 type
   TDesktopShortcutsForm = class(TForm)
     btnCancelar: TButton;
     btnGravar: TButton;
-    cBoxDesktop1: TComboBox;
-    cBoxDesktop2: TComboBox;
-    cBoxDesktop3: TComboBox;
-    edtAtalho1: THotKey;
-    edtAtalho2: THotKey;
-    edtAtalho3: THotKey;
-    lbAtalho: TLabel;
-    lbDesktop: TLabel;
     lbInstrucao: TLabel;
     pnBotoes: TPanel;
+    strGridAtalhos: TStringGrid;
     procedure btnGravarClick(ASender: TObject);
+    procedure FormShortCut(var AMessage: TWMKey; var AHandled: Boolean);
+    procedure strGridAtalhosKeyDown(ASender: TObject; var AKey: Word;
+      AShift: TShiftState);
   private
-    procedure ConfigureCombo(AComboBox: TComboBox; const ADesktopName: string);
-    procedure LoadConfiguration;
-    procedure LoadDesktops(ADesktopNames: TStrings);
+    FItems: TDesktopShortcutItems;
+    function ApplyShortcut(AKey: Word; AShift: TShiftState): Boolean;
+    procedure LoadConfiguration(ADesktopNames: TStrings);
     function ValidateConfiguration: Boolean;
   public
     class function Execute(ADesktopNames: TStrings): Boolean; static;
@@ -41,114 +40,108 @@ implementation
 
 {$R *.dfm}
 
+function TDesktopShortcutsForm.ApplyShortcut(AKey: Word;
+  AShift: TShiftState): Boolean;
+begin
+  Result := False;
+
+  if not strGridAtalhos.Focused or (strGridAtalhos.Row <= 0) or
+    (strGridAtalhos.Row > Length(FItems)) then
+    Exit;
+
+  if AKey in [VK_SHIFT, VK_CONTROL, VK_MENU, VK_TAB, VK_RETURN, VK_ESCAPE] then
+    Exit;
+
+  var LIndex := Pred(strGridAtalhos.Row);
+  if AKey in [VK_DELETE, VK_BACK] then
+    FItems[LIndex].Shortcut := 0
+  else
+  begin
+    var LModifiers := AShift * [ssShift, ssCtrl, ssAlt];
+    if (LModifiers = []) and ((AKey < VK_F1) or (AKey > VK_F24)) then
+      Exit;
+    FItems[LIndex].Shortcut := Vcl.Menus.ShortCut(AKey, LModifiers);
+  end;
+
+  strGridAtalhos.Cells[1, strGridAtalhos.Row] := ShortCutToText(FItems[LIndex].Shortcut);
+  Result := True;
+end;
+
 procedure TDesktopShortcutsForm.btnGravarClick(ASender: TObject);
 begin
   if not Self.ValidateConfiguration then
     Exit;
 
-  var LItems: TDesktopShortcutItems;
-  LItems[0].DesktopName := cBoxDesktop1.Text;
-  LItems[0].Shortcut := edtAtalho1.HotKey;
-  LItems[1].DesktopName := cBoxDesktop2.Text;
-  LItems[1].Shortcut := edtAtalho2.HotKey;
-  LItems[2].DesktopName := cBoxDesktop3.Text;
-  LItems[2].Shortcut := edtAtalho3.HotKey;
-  TDesktopShortcutSettings.Save(LItems);
+  TDesktopShortcutSettings.Save(FItems);
   ModalResult := mrOk;
 end;
 
-procedure TDesktopShortcutsForm.ConfigureCombo(AComboBox: TComboBox;
-  const ADesktopName: string);
+procedure TDesktopShortcutsForm.FormShortCut(var AMessage: TWMKey;
+  var AHandled: Boolean);
 begin
-  if AComboBox.Items.IndexOf(ADesktopName) < 0 then
-    AComboBox.Items.Add(ADesktopName);
-
-  AComboBox.ItemIndex := AComboBox.Items.IndexOf(ADesktopName);
+  AHandled := Self.ApplyShortcut(AMessage.CharCode, KeyboardStateToShiftState);
 end;
 
 class function TDesktopShortcutsForm.Execute(ADesktopNames: TStrings): Boolean;
 begin
   var LForm := TDesktopShortcutsForm.Create(nil);
   try
-    LForm.LoadDesktops(ADesktopNames);
-    LForm.LoadConfiguration;
+    LForm.LoadConfiguration(ADesktopNames);
     Result := LForm.ShowModal = mrOk;
   finally
     LForm.Free;
   end;
 end;
 
-procedure TDesktopShortcutsForm.LoadConfiguration;
+procedure TDesktopShortcutsForm.LoadConfiguration(ADesktopNames: TStrings);
 begin
-  var LItems: TDesktopShortcutItems;
-  TDesktopShortcutSettings.Load(LItems);
-  Self.ConfigureCombo(cBoxDesktop1, LItems[0].DesktopName);
-  Self.ConfigureCombo(cBoxDesktop2, LItems[1].DesktopName);
-  Self.ConfigureCombo(cBoxDesktop3, LItems[2].DesktopName);
-  edtAtalho1.HotKey := LItems[0].Shortcut;
-  edtAtalho2.HotKey := LItems[1].Shortcut;
-  edtAtalho3.HotKey := LItems[2].Shortcut;
+  TDesktopShortcutSettings.Load(FItems);
+  TDesktopShortcutSettings.Synchronize(ADesktopNames, FItems);
+
+  strGridAtalhos.Cells[0, 0] := 'Desktop';
+  strGridAtalhos.Cells[1, 0] := 'Atalho';
+  strGridAtalhos.ColWidths[0] := 370;
+  strGridAtalhos.ColWidths[1] := 180;
+
+  if Length(FItems) > 0 then
+    strGridAtalhos.RowCount := Succ(Length(FItems))
+  else
+    strGridAtalhos.RowCount := 2;
+
+  for var i := 0 to High(FItems) do
+  begin
+    var LRow := Succ(i);
+    strGridAtalhos.Cells[0, LRow] := FItems[i].DesktopName;
+    strGridAtalhos.Cells[1, LRow] := ShortCutToText(FItems[i].Shortcut);
+  end;
 end;
 
-procedure TDesktopShortcutsForm.LoadDesktops(ADesktopNames: TStrings);
+procedure TDesktopShortcutsForm.strGridAtalhosKeyDown(ASender: TObject;
+  var AKey: Word; AShift: TShiftState);
 begin
-  cBoxDesktop1.Items.Assign(ADesktopNames);
-  cBoxDesktop2.Items.Assign(ADesktopNames);
-  cBoxDesktop3.Items.Assign(ADesktopNames);
+  if Self.ApplyShortcut(AKey, AShift) then
+    AKey := 0;
 end;
 
 function TDesktopShortcutsForm.ValidateConfiguration: Boolean;
 begin
   Result := False;
 
-  if cBoxDesktop1.ItemIndex < 0 then
+  for var i := 0 to High(FItems) do
   begin
-    MessageDlg('Selecione o primeiro Desktop.', mtWarning, [mbOK], 0);
-    cBoxDesktop1.SetFocus;
-    Exit;
-  end;
+    if FItems[i].Shortcut = 0 then
+      Continue;
 
-  if cBoxDesktop2.ItemIndex < 0 then
-  begin
-    MessageDlg('Selecione o segundo Desktop.', mtWarning, [mbOK], 0);
-    cBoxDesktop2.SetFocus;
-    Exit;
-  end;
-
-  if cBoxDesktop3.ItemIndex < 0 then
-  begin
-    MessageDlg('Selecione o terceiro Desktop.', mtWarning, [mbOK], 0);
-    cBoxDesktop3.SetFocus;
-    Exit;
-  end;
-
-  if edtAtalho1.HotKey = 0 then
-  begin
-    MessageDlg('Informe o primeiro atalho.', mtWarning, [mbOK], 0);
-    edtAtalho1.SetFocus;
-    Exit;
-  end;
-
-  if edtAtalho2.HotKey = 0 then
-  begin
-    MessageDlg('Informe o segundo atalho.', mtWarning, [mbOK], 0);
-    edtAtalho2.SetFocus;
-    Exit;
-  end;
-
-  if edtAtalho3.HotKey = 0 then
-  begin
-    MessageDlg('Informe o terceiro atalho.', mtWarning, [mbOK], 0);
-    edtAtalho3.SetFocus;
-    Exit;
-  end;
-
-  if (edtAtalho1.HotKey = edtAtalho2.HotKey) or
-    (edtAtalho1.HotKey = edtAtalho3.HotKey) or
-    (edtAtalho2.HotKey = edtAtalho3.HotKey) then
-  begin
-    MessageDlg('Os atalhos devem ser diferentes.', mtWarning, [mbOK], 0);
-    Exit;
+    for var j := Succ(i) to High(FItems) do
+      if FItems[i].Shortcut = FItems[j].Shortcut then
+      begin
+        MessageDlg(Format('O atalho %s esta associado aos Desktops "%s" e "%s".',
+          [ShortCutToText(FItems[i].Shortcut), FItems[i].DesktopName,
+          FItems[j].DesktopName]), mtWarning, [mbOK], 0);
+        strGridAtalhos.Row := Succ(j);
+        strGridAtalhos.SetFocus;
+        Exit;
+      end;
   end;
 
   Result := True;

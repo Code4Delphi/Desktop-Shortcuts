@@ -15,9 +15,10 @@ type
   TDesktopShortcutsWizard = class(TNotifierObject, IOTAWizard)
   private
     FConfigureMenuItem: TMenuItem;
-    FDesktopActions: array[0..2] of TAction;
+    FDesktopActions: array of TAction;
     FItems: TDesktopShortcutItems;
     procedure ApplySettings;
+    procedure ClearActions;
     procedure ConfigureMenuClick(ASender: TObject);
     procedure DesktopActionExecute(ASender: TObject);
     function FindDesktopItem(AParent: TMenuItem; const ADesktopName: string): TMenuItem;
@@ -49,21 +50,20 @@ end;
 destructor TDesktopShortcutsWizard.Destroy;
 begin
   FConfigureMenuItem.Free;
-  for var i := 0 to Pred(CDesktopShortcutCount) do
-    FDesktopActions[i].Free;
+  Self.ClearActions;
   inherited Destroy;
 end;
 
 procedure TDesktopShortcutsWizard.ApplySettings;
 begin
-  TDesktopShortcutSettings.Load(FItems);
+  Self.RegisterActions;
+end;
 
-  for var i := 0 to Pred(CDesktopShortcutCount) do
-  begin
-    FDesktopActions[i].Caption := 'Desktop: ' + FItems[i].DesktopName;
-    FDesktopActions[i].Hint := 'Ativar o Desktop ' + FItems[i].DesktopName;
-    FDesktopActions[i].ShortCut := FItems[i].Shortcut;
-  end;
+procedure TDesktopShortcutsWizard.ClearActions;
+begin
+  for var i := 0 to High(FDesktopActions) do
+    FDesktopActions[i].Free;
+  SetLength(FDesktopActions, 0);
 end;
 
 procedure TDesktopShortcutsWizard.ConfigureMenuClick(ASender: TObject);
@@ -84,7 +84,7 @@ begin
     Exit;
 
   var LIndex := TAction(ASender).Tag;
-  if (LIndex < 0) or (LIndex >= CDesktopShortcutCount) then
+  if (LIndex < 0) or (LIndex > High(FItems)) then
     Exit;
 
   Self.SwitchDesktop(FItems[LIndex].DesktopName);
@@ -160,7 +160,8 @@ begin
       Break;
 
     var LCaption := StringReplace(LMenuItem.Caption, '&', '', [rfReplaceAll]).Trim;
-    if not LCaption.IsEmpty and (LCaption <> '-') and (LCaption.ToUpper <> '<NONE>') then
+    if not LCaption.IsEmpty and (LCaption <> '-') and (LCaption.ToUpper <> '<NONE>') and
+      (AItems.IndexOf(LCaption) < 0) then
       AItems.Add(LCaption);
   end;
 end;
@@ -172,18 +173,29 @@ begin
   if not Supports(BorlandIDEServices, INTAServices, LNTAServices) then
     raise Exception.Create('Nao foi possivel acessar os servicos de menu do RAD Studio.');
 
-  TDesktopShortcutSettings.Load(FItems);
-  for var i := 0 to Pred(CDesktopShortcutCount) do
-  begin
-    FDesktopActions[i] := TAction.Create(nil);
-    FDesktopActions[i].Name := 'DesktopShortcutsAction' + (i + 1).ToString;
-    FDesktopActions[i].Caption := 'Desktop: ' + FItems[i].DesktopName;
-    FDesktopActions[i].Category := 'Desktop Shortcuts';
-    FDesktopActions[i].Hint := 'Ativar o Desktop ' + FItems[i].DesktopName;
-    FDesktopActions[i].ShortCut := FItems[i].Shortcut;
-    FDesktopActions[i].Tag := i;
-    FDesktopActions[i].OnExecute := Self.DesktopActionExecute;
-    FDesktopActions[i].ActionList := LNTAServices.ActionList;
+  Self.ClearActions;
+
+  var LDesktopNames := TStringList.Create;
+  try
+    Self.GetDesktopNames(LDesktopNames);
+    TDesktopShortcutSettings.Load(FItems);
+    TDesktopShortcutSettings.Synchronize(LDesktopNames, FItems);
+    SetLength(FDesktopActions, Length(FItems));
+
+    for var i := 0 to High(FItems) do
+    begin
+      FDesktopActions[i] := TAction.Create(nil);
+      FDesktopActions[i].Name := 'DesktopShortcutsAction' + Succ(i).ToString;
+      FDesktopActions[i].Caption := 'Desktop: ' + FItems[i].DesktopName;
+      FDesktopActions[i].Category := 'Desktop Shortcuts';
+      FDesktopActions[i].Hint := 'Ativar o Desktop ' + FItems[i].DesktopName;
+      FDesktopActions[i].ShortCut := FItems[i].Shortcut;
+      FDesktopActions[i].Tag := i;
+      FDesktopActions[i].OnExecute := Self.DesktopActionExecute;
+      FDesktopActions[i].ActionList := LNTAServices.ActionList;
+    end;
+  finally
+    LDesktopNames.Free;
   end;
 end;
 
