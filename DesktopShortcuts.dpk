@@ -1,0 +1,16 @@
+package DesktopShortcuts;
+
+{$R *.res}
+{$DESCRIPTION 'Atalhos para alternar os Desktops do RAD Studio'}
+{$DESIGNONLY}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl,
+  vcl,
+  designide;
+
+contains
+  DesktopShortcuts.Wizard in 'DesktopShortcuts.Wizard.pas';
+
+end.
